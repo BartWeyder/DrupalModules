@@ -1,0 +1,135 @@
+<?php
+
+/*
+tag for fields:
+    <a href="[field_abstract_pdf]"><img src="http://www.sporthorses.co.uk/img/detail/pdf-logo.png" /></a>
+*/
+
+function mymodule_menu() {
+    $items = array();
+
+    $items['my_module/hello_world'] = array(
+        'title' => 'Hello World Test',
+        'page callback' => 'say_hello_world',
+        'access arguments' => array('access content'),
+        'type' => MENU_CALLBACK,
+     );
+
+    return $items;
+}
+
+function say_hello_world() {
+    $vars = array();
+    $vars['type']="ul";
+    $vars['title'] = "";
+    $vars['attributes']=array("");
+
+    //own logger needs some vars
+    $logger_counter = 0;
+
+    //node load
+    $w_nodes = array();    
+    $nodes = node_load_multiple(NULL, array('type' => 'final_work', 'language' => 'en'));
+    $logger_counter++;
+    /*
+        I've created extra array of nodes, because lovely Drupal makes keys in array == nids, so keys
+        in $w_nodes and in $nodes are differnet => we need it equal.
+    */
+    foreach($nodes as $node) {
+        $sorted_nodes[] = $node;
+        $w_nodes[] = entity_metadata_wrapper('node', $node);
+    }
+    $nodes = NULL;
+    
+    /*
+        Here I used mega KOSTYL: Getting from wrapper object fid, load file object by this fid and than
+        delete file.
+        This code loads file, deletes field record in db and deletes file. 
+        TODO: make loop to clear all records with checking if field have file or you'll get error\exeption
+    */
+
+    /*
+    $vars['items'][$logger_counter] = $sorted_nodes[5]->nid;
+    $logger_counter++;
+    $deleted_filename = $w_nodes[5]->field_final_work_pdf->file->name->value();
+    $vars['items'][$logger_counter] = $deleted_filename;
+    $logger_counter++;
+    $test_file_to_delete = file_load($w_nodes[5]->field_final_work_pdf->file->fid->value());
+    
+    $w_nodes[5]->field_final_work_pdf->set(NULL);
+    $w_nodes[5]->save();
+    if(file_delete($test_file_to_delete, TRUE)) {
+        $vars['items'][$logger_counter] = "Nid=" . $sorted_nodes[5]->nid . " file "
+        . $deleted_filename . " deleted";
+        $logger_counter++;
+    }
+    else {
+        $vars['items'][$logger_counter] = "ERROR";
+        $logger_counter++;
+    }
+
+    */
+
+    //$vars['items'][$logger_counter] = $w_nodes[1]->field_final_work_pdf->file->fid->value();
+
+    //load files and test
+    $fids = array(1528, 1529);
+    
+    foreach($fids as $fid){
+        $test_file_obj = file_load($fid);
+        //$vars['items'][2] 
+        $current_filename = $test_file_obj->filename;
+        $file_info_array = explode("_", $current_filename);
+        if (count($file_info_array) != 5) {
+            $vars['items'][$logger_counter] = "Logger ERROR: Unexpected name of file (fid==" . $fid . ")";
+            $logger_counter++;
+        }
+        else {
+            $file_year = $file_info_array[0];
+            $file_type = $file_info_array[1];
+            $file_surname = $file_info_array[2];        
+            $file_filetype = $file_info_array[3];
+            $file_lang = $file_info_array[4];
+            if(strlen($file_lang) == 7) {
+                $file_lang = "und";
+            }
+            else {
+                if(mb_strpos($file_lang, "uk") == FALSE) {
+                    $file_lang = "en";
+                }
+                else {
+                    $file_lang = "uk";
+                }
+            }
+            
+        }
+
+        //loop for cheking entities
+        for ($i = 0; $i < count($w_nodes); $i++) {
+            if((mb_stristr($w_nodes[$i]->field_student_name->value(), $file_surname) != FALSE) 
+                && (strcasecmp($w_nodes[$i]->field_work_year->value(), $file_year) == 0)) {
+                if(strcasecmp($file_lang, "en") == 0) {
+                    switch($file_filetype) {
+                        case "abstract":
+                            $w_nodes[$i]->field_abstract_pdf->file->set($test_file_obj);
+                            break;
+                        case "references":
+                            $w_nodes[$i]->field_references_pdf->file->set($test_file_obj);
+                            break;
+                        case "full":
+                            $w_nodes[$i]->field_final_work_pdf->file->set($test_file_obj);
+                            break;
+                        default: 
+                            $vars['items'][$logger_counter] = "Failed on checking filetype; nid = " . $sorted_nodes[$i]->nid;
+                            break;
+                    }
+                    $w_nodes[$i]->save();
+                    break;
+                }
+            }
+        }
+    }
+
+
+    return theme_item_list($vars);
+}
