@@ -1,0 +1,83 @@
+<?php
+
+function upload2015_menu() {
+    $items = array();
+
+    $items['upload2015/upload'] = array(
+        'title' => 'Uploading 2015 files',
+        'page callback' => 'upload_2015',
+        'access arguments' => array('access content'),
+        'type' => MENU_CALLBACK,
+     );
+
+    return $items;
+}
+
+function upload_2015() {
+    $vars = array();
+    $vars['type']="ul";
+    $vars['title'] = "";
+    $vars['attributes']=array("");
+
+    $logger_counter = 0;
+
+    $nodes = node_load_multiple(NULL, array('type' => 'final_work', 'language' => 'und'));
+    $w_nodes = array();
+    foreach($nodes as $node) {
+        $w_nodes[] = entity_metadata_wrapper('node', $node);
+    }
+
+    //load files, change range later
+    $fids = range(1528, 1652);
+    foreach($fids as $fid) {
+        $test_file_obj = file_load($fid);
+        $current_filename = $test_file_obj->filename;
+        $file_info_array = explode("_", $current_filename);
+        if (count($file_info_array) != 5) {
+            $vars['items'][$logger_counter] = "Logger ERROR: Unexpected name of file (fid==" . $fid . ")";
+            $logger_counter++;
+        }
+        else {
+            $file_year = $file_info_array[0];
+            $file_type = $file_info_array[1];
+            $file_surname = $file_info_array[2];        
+            $file_filetype = $file_info_array[3];
+        }
+
+        foreach($w_nodes as $w_node) {
+            if(mb_stristr($w_node->field_final_work_pdf->file->name->value(), $file_surname) != FALSE) {
+                switch($file_filetype) {
+                    case "abstract":
+                        $w_node->field_abstract_pdf->file->set($test_file_obj);
+                        $vars['items'][$logger_counter] = "Abstract set for nid = " . $w_node->nid->value()
+                        . "fid = " . $fid;
+                        $logger_counter++;
+                        break;
+                    case "references":
+                        $w_node->field_references_pdf->file->set($test_file_obj);
+                        $vars['items'][$logger_counter] = "Reference set for nid = " . $w_node->nid->value() . "
+                        fid = " . $fid;
+                        $logger_counter++;
+                        break;
+                    case "full":
+                        //$file_to_delete = file_load($w_node->field_final_work_pdf->file->fid->value());
+                        //$w_node->field_final_work_pdf->set(NULL);
+                        $w_node->field_final_work_pdf->file->set($test_file_obj);
+                        $w_node->save();
+                        //file_delete($file_to_delete, TRUE);
+                        $vars['items'][$logger_counter] = "Full set for nid = " . $w_node->nid->value() . "
+                        fid = " . $fid;
+                        $logger_counter++;
+                        break;
+                    default: 
+                        $vars['items'][$logger_counter] = "Failed on checking filetype; nid = " . $w_node->nid->info();
+                        break;
+                }
+                $w_node->save();
+            }
+        }
+
+    }
+
+    return theme_item_list($vars);    
+}

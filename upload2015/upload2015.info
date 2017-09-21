@@ -1,0 +1,6 @@
+name = upload2015
+description = upload for 2015 nodes
+package = public-action
+version = VERSION
+core = 7.x
+files[] = upload2015.module

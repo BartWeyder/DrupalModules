@@ -1,0 +1,6 @@
+name = upload_fix
+description = unattaches all files in final_work records
+package = public-action
+version = VERSION
+core = 7.x
+files[] = upload_fix.module

@@ -1,0 +1,53 @@
+<?php
+
+function upload_fix_menu() {
+    $items = array();
+
+    $items['upload/fix'] = array(
+        'title' => 'Fixed upload',
+        'page callback' => 'upload_fix',
+        'access arguments' => array('access content'),
+        'type' => MENU_CALLBACK,
+     );
+
+    return $items;
+}
+
+function upload_fix() {
+    $vars = array();
+    $vars['type']="ul";
+    $vars['title'] = "";
+    $vars['attributes']=array("");
+
+    $logger_counter = 0;
+
+    $nodes = node_load_multiple(NULL, array('type' => 'final_work'));
+    $w_nodes = array();
+    $title = array();
+    foreach($nodes as $node) {
+        $w_nodes[] = entity_metadata_wrapper('node', $node);
+    }
+
+    //$vars['items'][$logger_counter] = gettype($w_nodes[0]->field_final_work_type->value());
+    //$logger_counter++;
+
+    foreach($w_nodes as $w_node) {
+        if(strcasecmp($w_node->field_work_year->value(), "2017") == 0) {
+            $w_node->field_final_work_pdf->set(NULL);
+            //$w_node->field_references_pdf->set(NULL);
+            //$w_node->field_abstract_pdf->set(NULL);
+
+            $title = explode('[', $w_node->title->value());
+            $w_node->title->set($title[0]);
+            $w_node->save();
+        }
+    }
+
+    /*for($i = 2105; $i < 2120; $i++) {
+        $file = file_load($i);
+        file_delete($file, TRUE);
+    }*/
+
+    return theme_item_list($vars);        
+    
+}

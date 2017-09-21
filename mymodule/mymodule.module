@@ -2,14 +2,16 @@
 
 /*
 tag for fields:
-    <a href="[field_abstract_pdf]"><img src="http://www.sporthorses.co.uk/img/detail/pdf-logo.png" /></a>
+    <a href="[field_abstract_pdf]" target="_blank">
+    <img src="http://www.sporthorses.co.uk/img/detail/pdf-logo.png" />
+    </a>
 */
 
 function mymodule_menu() {
     $items = array();
 
     $items['my_module/hello_world'] = array(
-        'title' => 'Hello World Test',
+        'title' => 'Main Upload',
         'page callback' => 'say_hello_world',
         'access arguments' => array('access content'),
         'type' => MENU_CALLBACK,
@@ -27,10 +29,54 @@ function say_hello_world() {
     //own logger needs some vars
     $logger_counter = 0;
 
+    //code to delete old files
+    $nodes_to_clear = node_load_multiple(NULL, array('type' => 'final_work'));
+    $w_nodes_to_clear = array();
+    foreach($nodes_to_clear as $nds) {
+        $new_title = explode("[", $nds->title);
+        $nds->title = $new_title[0];
+        if(strcasecmp($nds->language, "und") != 0) 
+            $w_nodes_to_clear[] = entity_metadata_wrapper('node', $nds);
+    }
+    
+    /*$vars['items'][$logger_counter] = count($w_nodes_to_clear);
+    $logger_counter++;*/
+
+
+    /*
+    This code is for case when smth will go wrong, so it will unattach all files from 2016 and 2017,
+    but will not delete them
+
+    foreach($w_nodes_to_clear as $wrappers) {
+        $wrappers->field_final_work_pdf->set(NULL);
+        $wrappers->save();
+    }
+    */
+    
+    /*foreach($w_nodes_to_clear as $w_node) {
+        if($w_node->field_final_work_pdf->value() != NULL) {
+            $file_to_delete = file_load($w_node->field_final_work_pdf->file->fid->value());
+            $deleted_filename = $w_node->field_final_work_pdf->file->name->value();
+            
+            $w_node->field_final_work_pdf->set(NULL);
+            $w_node->save();
+
+            if(file_delete($file_to_delete, TRUE)) {
+                $vars['items'][$logger_counter] = "Nid=" . $w_node->nid->value() . " file "
+                . $deleted_filename . " deleted";
+                $logger_counter++;
+            }
+            else {
+                $vars['items'][$logger_counter] = "ERROR on nid=" . $w_node->nid->value();
+                $logger_counter++;
+            }
+        }
+    }*/
+
+    
     //node load
     $w_nodes = array();    
     $nodes = node_load_multiple(NULL, array('type' => 'final_work', 'language' => 'en'));
-    $logger_counter++;
     /*
         I've created extra array of nodes, because lovely Drupal makes keys in array == nids, so keys
         in $w_nodes and in $nodes are differnet => we need it equal.
@@ -38,46 +84,17 @@ function say_hello_world() {
     foreach($nodes as $node) {
         $sorted_nodes[] = $node;
         $w_nodes[] = entity_metadata_wrapper('node', $node);
+        
     }
     $nodes = NULL;
     
-    /*
-        Here I used mega KOSTYL: Getting from wrapper object fid, load file object by this fid and than
-        delete file.
-        This code loads file, deletes field record in db and deletes file. 
-        TODO: make loop to clear all records with checking if field have file or you'll get error\exeption
-    */
-
-    /*
-    $vars['items'][$logger_counter] = $sorted_nodes[5]->nid;
-    $logger_counter++;
-    $deleted_filename = $w_nodes[5]->field_final_work_pdf->file->name->value();
-    $vars['items'][$logger_counter] = $deleted_filename;
-    $logger_counter++;
-    $test_file_to_delete = file_load($w_nodes[5]->field_final_work_pdf->file->fid->value());
-    
-    $w_nodes[5]->field_final_work_pdf->set(NULL);
-    $w_nodes[5]->save();
-    if(file_delete($test_file_to_delete, TRUE)) {
-        $vars['items'][$logger_counter] = "Nid=" . $sorted_nodes[5]->nid . " file "
-        . $deleted_filename . " deleted";
-        $logger_counter++;
-    }
-    else {
-        $vars['items'][$logger_counter] = "ERROR";
-        $logger_counter++;
-    }
-
-    */
-
-    //$vars['items'][$logger_counter] = $w_nodes[1]->field_final_work_pdf->file->fid->value();
-
     //load files and test
-    $fids = array(1528, 1529);
+    $fids2016 = range(1656, 1859);
+    $fids2017 = range(1860, 2070);
+    $fids = $fids2017;//array_merge($fids2016, $fids2017);
     
     foreach($fids as $fid){
         $test_file_obj = file_load($fid);
-        //$vars['items'][2] 
         $current_filename = $test_file_obj->filename;
         $file_info_array = explode("_", $current_filename);
         if (count($file_info_array) != 5) {
@@ -94,7 +111,7 @@ function say_hello_world() {
                 $file_lang = "und";
             }
             else {
-                if(mb_strpos($file_lang, "uk") == FALSE) {
+                if(mb_stristr($file_lang, "uk") == FALSE) {
                     $file_lang = "en";
                 }
                 else {
@@ -104,26 +121,98 @@ function say_hello_world() {
             
         }
 
-        //loop for cheking entities
+        /*
+            Loop for cheking entities
+            There is an example of getting translations wrappers in documentation, but for some unknown
+            reasons it did not work here for me. So I implemented my own variant:
+        */
+        $en = FALSE;
+        $uk = FALSE;
+        $ru = FALSE;
+
         for ($i = 0; $i < count($w_nodes); $i++) {
+        
+
             if((mb_stristr($w_nodes[$i]->field_student_name->value(), $file_surname) != FALSE) 
                 && (strcasecmp($w_nodes[$i]->field_work_year->value(), $file_year) == 0)) {
-                if(strcasecmp($file_lang, "en") == 0) {
-                    switch($file_filetype) {
-                        case "abstract":
-                            $w_nodes[$i]->field_abstract_pdf->file->set($test_file_obj);
-                            break;
-                        case "references":
-                            $w_nodes[$i]->field_references_pdf->file->set($test_file_obj);
-                            break;
-                        case "full":
-                            $w_nodes[$i]->field_final_work_pdf->file->set($test_file_obj);
-                            break;
-                        default: 
-                            $vars['items'][$logger_counter] = "Failed on checking filetype; nid = " . $sorted_nodes[$i]->nid;
-                            break;
+                
+                switch($file_lang) {
+                    case "en":
+                        //$temp_node = $sorted_nodes[$i];
+                        $w_attach_nodes[] = $w_nodes[$i];
+                        $isFound = TRUE;
+                        break;
+                    case "uk":
+                    case "und":
+                        $search_counter = $sorted_nodes[$i]->tnid;
+                        if(strcasecmp($file_lang, "und") == 0) {
+                            $w_attach_nodes[] = $w_nodes[$i];
+                        }
+                        $en = TRUE; 
+
+                        //praying that this will not cause endless loop
+                        do {
+
+                            $temp_node = node_load($search_counter);
+                            if(strcasecmp($temp_node->type, "final_work") == 0) {
+                                if($temp_node->tnid == $sorted_nodes[$i]->tnid) {
+                                    if(strcasecmp($temp_node->language, "uk") == 0) {
+                                        $w_temp_node = entity_metadata_wrapper('node', $temp_node);
+                                        $w_attach_nodes[] = $w_temp_node;
+                                        $uk = TRUE;
+                                    }
+                                    if(strcasecmp($temp_node->language, "ru") == 0) {
+                                        $w_temp_node = entity_metadata_wrapper('node', $temp_node);
+                                        $w_attach_nodes[] = $w_temp_node;
+                                        $ru = TRUE;
+                                    }
+                                }
+                                else {
+                                    if($search_counter == 1497) {
+                                        $vars['items'][$logger_counter] = "Have'not found all variants for fid=" . $fid;
+                                        $logger_counter++;
+                                        break;
+                                    }
+                                }
+                            }
+                            $search_counter++;  
+
+                        } while (($en == FALSE) || ($uk == FALSE) || ($ru == FALSE));   
+                        $isFound = TRUE;  
+                        break;
+                }
+
+
+                if($isFound) {
+                    foreach($w_attach_nodes as $w_attach_node) {
+                        switch($file_filetype) {
+                            case "abstract":
+                                $w_attach_node->field_abstract_pdf->file->set($test_file_obj);
+                                $vars['items'][$logger_counter] = "Abstract set for nid = " . $w_attach_node->nid->value() . "
+                                fid = " . $fid;
+                                $logger_counter++;
+                                break;
+                            case "references":
+                                $w_attach_node->field_references_pdf->file->set($test_file_obj);
+                                $vars['items'][$logger_counter] = "Reference set for nid = " . $w_attach_node->nid->value() . "
+                                fid = " . $fid;
+                                $logger_counter++;
+                                break;
+                            case "full":
+                                $w_attach_node->field_final_work_pdf->file->set($test_file_obj);
+                                $vars['items'][$logger_counter] = "Full set for nid = " . $w_attach_node->nid->value() . "
+                                fid = " . $fid;
+                                $logger_counter++;
+                                break;
+                            default: 
+                                $vars['items'][$logger_counter] = "Failed on checking filetype; nid = " . $w_attach_node->nid->info();
+                                break;
+                        }
+                        $w_attach_node->save();
                     }
-                    $w_nodes[$i]->save();
+                    
+                    $isFound = FALSE;
+                    $w_attach_nodes = NULL;
                     break;
                 }
             }
